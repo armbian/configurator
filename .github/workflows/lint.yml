@@ -3,6 +3,7 @@ name: Lint scripts
 on:
   workflow_dispatch:
   pull_request:
+    types: [submitted]
 
 jobs:
 
@@ -10,7 +11,7 @@ jobs:
 
     name: Shell script analysis
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'Armbian' }}
+    if: ${{ github.repository_owner == 'Armbian' && github.event.review.state == 'approved' }}
     steps:
 
        - name: Checkout repository
