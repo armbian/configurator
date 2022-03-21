@@ -3,7 +3,6 @@ name: Lint scripts
 on:
   workflow_dispatch:
   pull_request:
-    types: [review_requested, ready_for_review]
 
 jobs:
 
@@ -23,11 +22,5 @@ jobs:
        - name: "Shellcheck lint error report in diff format"
          shell: bash {0}
          run: |
-           (for file in $(find . -type f -exec grep -Iq . {} \; -print); do shellcheck --format=diff $file; done;) 2> /dev/null > lib.diff || true
-       - name: Upload build artifacts
-         uses: actions/upload-artifact@v2
-         with:
-          name: Shellcheck
-          path: "*.diff"
-          if-no-files-found: ignore
-          retention-days: 14
+
+           for file in $(find . -type f -executable ! -path '*/.git*/*' -exec grep -Iq . {} \; -print); do shellcheck -x $file; done

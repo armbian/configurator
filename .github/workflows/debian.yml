@@ -22,6 +22,7 @@ jobs:
       section: "default"
       priority: "optional"
       description: "Configurator"
+
     secrets:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       PASSPHRASE: ${{ secrets.PASSPHRASE }}
