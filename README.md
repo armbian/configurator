@@ -1,4 +1,4 @@
-# Configurator
+# Armbian configurator
 
 [![Build debian package](https://github.com/armbian/configurator/actions/workflows/debian.yml/badge.svg)](https://github.com/armbian/configurator/actions/workflows/debian.yml)
 
