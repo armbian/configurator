@@ -12,7 +12,7 @@ on:
 jobs:
 
   Debian:
-    uses: igorpecovnik/scripts/.github/workflows/releasing.yml@master
+    uses: armbian/scripts/.github/workflows/pack-debian.yml@master
     with:
       matrix: "all:focal"
       maintainer: "Igor Pecovnik <igor@armbian.com>"
