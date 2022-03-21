@@ -1,0 +1,29 @@
+name: Build debian package
+#
+# Description
+#
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - master  
+
+jobs:
+
+  Debian:
+    uses: igorpecovnik/scripts/.github/workflows/releasing.yml@master
+    with:
+      matrix: "all:focal"
+      maintainer: "Igor Pecovnik <igor@armbian.com>"
+      package: "configurator"
+      licence: "GPL 2.0"
+      homepage: "https://www.armbian.com"
+      section: "default"
+      priority: "optional"
+      description: "Configurator"
+    secrets:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      PASSPHRASE: ${{ secrets.PASSPHRASE }}
+      SSH_KEY_TORRENTS: ${{ secrets.SSH_KEY_TORRENTS }}
+      KNOWN_HOSTS_UPLOAD: ${{ secrets.KNOWN_HOSTS_UPLOAD }} 
