@@ -24,7 +24,7 @@ jobs:
       description: "Configurator"
 
     secrets:
-      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      PASSPHRASE: ${{ secrets.PASSPHRASE }}
-      SSH_KEY_TORRENTS: ${{ secrets.SSH_KEY_TORRENTS }}
-      KNOWN_HOSTS_UPLOAD: ${{ secrets.KNOWN_HOSTS_UPLOAD }} 
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_KEY1 }}
+      PASSPHRASE: ${{ secrets.GPG_PASSPHRASE1 }}
+      SSH_KEY_TORRENTS: ${{ secrets.KEY_TORRENTS }}
+      KNOWN_HOSTS_UPLOAD: ${{ secrets.KNOWN_HOSTS_TORRENTS }} 
