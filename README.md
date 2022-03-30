@@ -8,8 +8,9 @@
 
 It is updated on this repository push.
 
-    wget -qO- https://imola.armbian.com/apt/armbian.key \ 
-    | gpg --dearmor | sudo tee > /usr/share/keyrings/armbian.gpg
-    sudo echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/armbian.gpg] https://armbian.github.io/configurator stable main" \
-    > /etc/apt/sources.list.d/armbian-development.list
+    wget -qO- https://imola.armbian.com/apt/armbian.key | gpg --dearmor | sudo tee /usr/share/keyrings/armbian.gpg > /dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/armbian.gpg] https://armbian.github.io/configurator stable main" | sudo tee /etc/apt/sources.list.d/armbian-development.list > /dev/null
+
+Install:
+
     sudo apt-get install configurator
