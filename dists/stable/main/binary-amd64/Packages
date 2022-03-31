@@ -1,13 +1,13 @@
 Package: configurator
-Version: 20220331-2210
+Version: 20220331-2218
 Architecture: all
 Maintainer: Igor Pecovnik <igor@armbian.com>
 Priority: optional
 Section: default
-Filename: pool/main/c/configurator/configurator_20220331-2210_all.deb
-Size: 12168
-SHA256: 3a29f5b442bf1dc422839b0e8c6700e062b57024afd1a5376103d6482c34a81d
-SHA1: 56b5a9f14f054a626284526f675a967e50933908
-MD5sum: 7712fb2f7d88d890c5bb915b754ca05c
+Filename: pool/main/c/configurator/configurator_20220331-2218_all.deb
+Size: 12160
+SHA256: 2a57fa7b933cd2b75aee7f06887392dc9e5b945efea1c3eeef983c95c7b8df15
+SHA1: 0f861fd4514f130f5a842dad139d8396aadaa086
+MD5sum: 3ac7d9d42734fb042eb2c0cd829a7c91
 Description: Configurator
 
