@@ -1,0 +1,246 @@
+#!/usr/bin/env python
+
+from abc import ABC, abstractmethod
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+import logging
+from pathlib import Path
+import os
+import shutil
+import subprocess
+import sys
+
+main_logger = logging.getLogger('main')
+main_logger.setLevel(logging.DEBUG)
+main_logger.addHandler(logging.StreamHandler())
+
+# TODO Move to library
+def list_dirs(from_dir=".", containing_files=[]) -> list:
+    entries = None
+    print(f'Check {from_dir} with files {containing_files}')
+    try:
+        entries = os.scandir(from_dir)
+    except Exception as e:
+        print(e)
+        return []
+    dirs = []
+    for entry in entries:
+        if entry.is_dir():
+            directory = entry.name
+            all_files_present = True
+            for file_to_search in containing_files:
+                checked_file_path = os.path.join(os.path.join(from_dir,directory), file_to_search)
+                file_exist = os.path.exists(checked_file_path)
+                main_logger.debug(f'Does {checked_file_path} exist ? {file_exist}')
+                all_files_present &= file_exist
+
+            if all_files_present:
+                dirs.append(directory)
+    return dirs
+
+class SystemServicesHandler(ABC):
+    @abstractmethod
+    def start(self, service_name:str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def stop(self, service_name:str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def status(self, service_name:str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_on_boot(self, service_name:str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_from_boot(self, service_name:str):
+        raise NotImplementedError
+
+class SystemDServicesHandler(SystemServicesHandler):
+
+    def systemd(self, action_name:str, service_name:str):
+        print(subprocess.run(["systemctl", action_name, service_name]))
+
+    def start(self, service_name:str):
+        self.systemd("start", service_name)
+
+    def stop(self, service_name:str):
+        self.systemd("stop", service_name)
+
+    def status(self, service_name:str):
+        self.systemd("status", service_name)
+
+    def add_on_boot(self, service_name:str):
+        self.systemd("enable", service_name)
+
+    def remove_from_boot(self, service_name:str):
+        self.systemd("disable", service_name)
+
+class DockerComposeModule:
+    MAIN_PATH=Path('/opt/armbian/docker')
+    DOCKER_SERVICE_NAME="docker"
+
+    # configuration :
+    #  install_dir: Path where docker services should be installed
+    #  templates_dir: Path where docker services are available from
+
+    def __init__(self, configuration):
+        self.configuration = configuration
+        configuration["install_dir"] = Path(configuration["install_dir"])
+        configuration["templates_dir"] = Path(configuration["templates_dir"])
+        self.logger = logging.getLogger('docker-compose module')
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(logging.StreamHandler())
+        self.services_handler = SystemDServicesHandler()
+
+    def installed_path(self, service_name:str):
+        return (self.configuration["install_dir"] / service_name)
+
+    @staticmethod
+    def list_installed(configuration) -> list:
+        return list_dirs(configuration["install_dir"], ["docker-compose.yml"])
+
+    @staticmethod
+    def list_available(configuration) -> list:
+        return list_dirs(configuration["templates_dir"], ["docker-compose.yml"])
+
+    # TODO Check if the service name is actually available ?
+    def docker_install(self, services_names:list):
+        if not services_names:
+            self.logger.debug('No docker to install')
+            return
+
+        install_path = self.configuration["install_dir"]
+        templates_path = self.configuration["templates_dir"]
+
+        try:
+            install_path.mkdir( mode=0o755, parents=True, exist_ok=True )
+        except Exception as e:
+            self.logger.error(f'mkdir -p {install_path} failed: ')
+            self.logger.error(e)
+            sys.exit(1)
+
+        for service_name in services_names:
+            shutil.copytree((templates_path / service_name), (install_path / service_name))
+
+    def docker_remove(self, services_names:list):
+        if not services_names:
+            self.logger.debug('No docker to remove')
+            return
+
+        for docker_compose_service in services_names:
+            remove_path = self.installed_path(docker_compose_service)
+            if remove_path.exists():
+                try:
+                    shutil.rmtree(remove_path)
+                except Exception as e:
+                    self.logger.error(f'Could not delete {remove_path}')
+                    continue
+            else:
+                self.logger.error(f'{remove_path} does not exist. Skipping {docker_compose_service}')
+                continue
+
+    def service_path(self, service_name: str, specific_file_path: str) -> Path:
+        returned_path = Path(self.MAIN_PATH / service_name)
+        if specific_file_path:
+            returned_path = Path(returned_path / specific_file_path)
+        return returned_path
+
+    def output_script_result(self, tool_name: str, args: []):
+        self.logger.debug(args)
+        print(subprocess.run([f'tools/{tool_name}'] + args))
+
+    def docker_service_start(self):
+        self.services_handler.start(self.configuration['service_name'])
+
+    def docker_service_stop(self):
+        self.services_handler.stop(self.configuration['service_name'])
+
+    def docker_service_status(self):
+        self.services_handler.status(self.configuration['service_name'])
+
+    def docker_service_add_on_boot(self):
+        self.services_handler.add_on_boot(self.configuration['service_name'])
+
+    def docker_service_remove_from_boot(self):
+        self.services_handler.remove_from_boot(self.configuration['service_name'])
+
+    # TODO Factorize
+    def compose_status(self, services_names: list):
+        if not services_names:
+            self.logger.debug('No services provided for status')
+            return
+
+        for service_name in services_names:
+            self.logger.info(f'Showing {service_name} status')
+            self.output_script_result(
+                tool_name = "compose_status.sh",
+                args = [self.service_path(service_name, "docker-compose.yml")])
+
+    def compose_start(self, services_names: list):
+        if not services_names:
+            self.logger.debug('No services provided for start')
+            return
+
+        for service_name in services_names:
+            self.logger.info(f'Starting {service_name}')
+            self.output_script_result(
+                tool_name = "compose_start.sh",
+                args = [self.service_path(service_name, "docker-compose.yml")])
+
+    def compose_stop(self, services_names: list):
+        if not services_names:
+            self.logger.debug('No services provided for stop')
+            return
+
+        for service_name in services_names:
+            self.logger.info(f'Stopping {service_name}')
+            self.output_script_result(
+                tool_name = "compose_stop.sh",
+                args = [self.service_path(service_name, "docker-compose.yml")])
+
+if __name__ == '__main__':
+    default_config = {
+        'templates_dir': '/usr/share/armbian/configurator/modules/docker/softwares',
+        'install_dir': '/opt/armbian/docker',
+        'service_name': 'docker',
+    }
+    config = default_config.copy()
+    available_dockers = DockerComposeModule.list_available(config)
+    installed_dockers = DockerComposeModule.list_installed(config)
+
+    parser = ArgumentParser(
+        description='Armbian docker installation module',
+        formatter_class=RawDescriptionHelpFormatter,
+        epilog=f'AVAILABLE_IMAGE : {available_dockers}\nINSTALLED_IMAGE : {installed_dockers}')
+    parser.add_argument('--install', nargs='+', metavar='AVAILABLE_IMAGE', choices=available_dockers, help='Add docker installations')
+    parser.add_argument('--remove', nargs='+', metavar='INSTALLED_IMAGE', choices=installed_dockers, help='Remove installed dockers')
+    parser.add_argument('--start', nargs='+', metavar='INSTALLED_IMAGE', choices=installed_dockers, help='Start selected installed docker-compose images')
+    parser.add_argument('--stop', nargs='+', metavar='INSTALLED_IMAGE', choices=installed_dockers, help='Stop selected installed docker-compose images')
+    parser.add_argument('--status', nargs='+', metavar='INSTALLED_IMAGE', choices=installed_dockers, help='Status of installed dockers')
+    #parser.add_argument('--edit', nargs=1, metavar='INSTALLED_IMAGE', choices=installed_dockers, help='Edit an installed docker-compose image YAML file')
+    parser.add_argument('--service', nargs=1, choices=['start', 'stop', 'status', 'enable', 'disable'], help='Manage the docker service')
+
+    args = parser.parse_args()
+    main_logger.debug(args.install)
+    module = DockerComposeModule(config)
+    if args.remove:
+        module.docker_remove(args.remove)
+    if args.install:
+        new_installs = [i for i in args.install if i not in module.list_installed(config)]
+        module.docker_install(new_installs)
+    if args.service:
+        actions = {
+            'start': module.docker_service_start,
+            'stop': module.docker_service_stop,
+            'status': module.docker_service_status,
+            'enable': module.docker_service_add_on_boot,
+            'disable': module.docker_service_remove_from_boot
+        }
+        actions[args.service[0]]()
+    module.compose_stop(args.stop)
+    module.compose_start(args.start)
+    module.compose_status(args.status)
+
