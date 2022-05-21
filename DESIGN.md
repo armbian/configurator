@@ -9,15 +9,15 @@ For each module you want to add :
 
 1. Create a directory inside `modules/`.
 2. Inside this directory add the following files :
-    1. **module.cli**
+    1. **module.cli**  
     The CLI version of the module that will be executed by default.  
     This can be symlinked to system binaries, if you know what you're
     doing.
-    2. **DESC**
+    2. **DESC**  
     A description of the module.  
     The first line should be brief, as it is shown in the list
     provided by the main **configurator**, when listing all the modules.
-    3. **armbian/cli/DEPS**
+    3. **armbian/cli/DEPS**  
     The list of additional Debian packages required to execute `module.cli`.  
     Only put the dependencies that are not required by the **configurator**
     itself.
@@ -27,9 +27,9 @@ For each module you want to add :
 Adding a GUI to a module, inside `modules/{module_name}`,
 you need to add :
 
-1. **module.gui**
+1. **module.gui**  
 The GUI version of the module.
-2. **armbian/gui/DEPS**
+2. **armbian/gui/DEPS**  
 The list of additional Debian packages required to execute `module.gui`.  
 Only put the dependencies that are not required by the **configurator**
 itself.  
