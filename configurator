@@ -46,6 +46,7 @@ def list_modules_with_descriptions() -> tuple:
     modules = list_modules()
     descriptions = []
     # TODO Error management with some files can't be opened
+    # TODO Implement locale management
     for module_name in modules:
         desc_file_path = MODULES_PATH / module_name / "DESC"
         with open(desc_file_path) as desc_file:
