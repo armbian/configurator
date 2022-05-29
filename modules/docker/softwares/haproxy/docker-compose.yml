@@ -1,0 +1,17 @@
+version: '3.4'
+
+services:
+
+  haproxy:
+    image: haproxy:latest
+    volumes:
+      - "./haproxy/conf:/usr/local/etc/haproxy:ro"
+      # Redirecting HAProxy logs can be troublesome
+      # The container /dev/log to host /dev/log does
+      # the trick, though.
+      - "/dev/log:/dev/log"
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+      - 8448:8448

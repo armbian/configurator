@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import subprocess
+import sys
+
+from PySide2.QtUiTools import QUiLoader
+from PySide2.QtWidgets import QApplication
+from PySide2.QtCore import QFile, QIODevice
+from PySide2.QtGui import QStandardItemModel, QStandardItem
+
+from library.docker_compose import DockerComposeModule
+
+class ModuleGUI:
+    UI_MAIN_WINDOW = "modulewindow_qt.ui"
+
+    main_window = None
+
+    def ui_refresh_lists(self):
+        list_data = [
+            [self.main_window.availableList.model(), self.engine.list_available(self.engine.configuration)],
+            [self.main_window.installedList.model(), self.engine.list_installed(self.engine.configuration)]
+        ]
+
+        for list_data_model_data in list_data:
+            model, data = list_data_model_data
+            model.clear()
+            for element in data:
+                model.appendRow(QStandardItem(element))
+
+    def logic_get_compose_yaml_content(self) -> str:
+        contents_list = self.engine.docker_compose_get_content([self.current_item['name']])
+        if contents_list:
+            return contents_list[0]
+        else:
+            return ''
+
+    # TODO The engine needs to provide these info correctly
+    # Or we need to use them in a more appropriate way
+    # Like display the errors accordingly
+    def logic_parse_outputs(self, outputs_list:list) -> str:
+        if outputs_list:
+            outputs = outputs_list[0]
+            return str(outputs[0]) + str(outputs[1])
+        else:
+            return ''
+
+    def logic_get_command_output(self, compose_service:str, engine_method) -> str:
+        return self.logic_parse_outputs(engine_method([compose_service]))
+
+    def logic_get_status_output(self) -> str:
+        return self.logic_get_command_output(self.current_item['name'], self.engine.compose_status)
+
+    def cb_up_button(self):
+        self.main_window.statusText.append(
+            self.logic_get_command_output(
+                self.current_item['name'],
+                self.engine.compose_start))
+
+    def cb_down_button(self):
+        self.main_window.statusText.append(
+            self.logic_get_command_output(
+                self.current_item['name'],
+                self.engine.compose_stop))
+
+    def cb_edit_button(self):
+        subprocess.run(['xdg-open', str(self.engine.compose_yaml_path(self.current_item['name']))])
+
+    def cb_uninstall_button(self):
+        self.engine.docker_remove([self.current_item['name']])
+        self.main_window.installedList.clearSelection()
+        self.ui_refresh_lists()
+
+    def cb_install_button(self):
+        self.engine.docker_install([self.current_item['name']])
+        self.main_window.availableList.clearSelection()
+        self.ui_refresh_lists()
+
+    def ui_show_current_item(self):
+        main_window = self.main_window
+        current_item = self.current_item
+
+        main_window.currentComposeNameLabel.text = current_item['name']
+
+        texts_contents = [
+            [main_window.runLogsText, None],
+            [main_window.yamlText, self.logic_get_compose_yaml_content],
+            [main_window.statusText, self.logic_get_status_output]
+        ]
+
+        for text_browser_and_content_func in texts_contents:
+            text_browser, content_func = text_browser_and_content_func
+            text_browser.clear()
+            if current_item['installed'] and content_func:
+                text_browser.append(content_func())
+
+        installed_buttons = [
+            [main_window.upButton, self.cb_up_button],
+            [main_window.downButton, self.cb_down_button],
+            [main_window.editButton, self.cb_edit_button],
+            [main_window.uninstallButton, self.cb_uninstall_button]
+        ]
+
+        available_buttons = [
+            [main_window.installButton, self.cb_install_button]
+        ]
+
+        for button_and_cb in installed_buttons:
+            button, cb = button_and_cb
+            if current_item['installed']:
+                button.show()
+                button.pressed.connect(cb)
+            else:
+                button.hide()
+
+        # TODO Factorize
+        for button_and_cb in available_buttons:
+            button, cb = button_and_cb
+            if not current_item['installed']:
+                button.show()
+                button.pressed.connect(cb)
+            else:
+                button.hide()
+
+
+    def cb_show_installed_item(self, item_index):
+        # TODO Remove this horrible hack
+        # TODO Make the two lists synced somehow, through group headers or something
+        self.main_window.availableList.clearSelection()
+        print(item_index.row())
+        print(item_index.data())
+        self.current_item = {'name': item_index.data(), 'installed': True}
+        self.ui_show_current_item()
+
+
+    def cb_show_available_item(self, item_index):
+        # TODO Remove this horrible hack
+        # TODO Make the two lists synced somehow, through group headers or something
+        self.main_window.installedList.clearSelection()
+        print(item_index.row())
+        print(item_index.data())
+        self.current_item = {'name': item_index.data(), 'installed': False}
+
+    def setupMainWindow(self):
+        lists = [
+            [self.main_window.installedList, self.cb_show_installed_item],
+            [self.main_window.availableList, self.cb_show_available_item]
+        ]
+
+        for list_view_and_cb in lists:
+            list_view, cb = list_view_and_cb
+            list_view.setModel(QStandardItemModel())
+            list_view.clicked.connect(cb)
+
+        self.ui_refresh_lists()
+
+    def __init__(self, engine):
+        self.engine = engine
+
+    def start(self):
+        app = QApplication(sys.argv)
+        ui_file = QFile(self.UI_MAIN_WINDOW)
+        if not ui_file.open(QIODevice.ReadOnly):
+            print("Cannot open {}: {}".format(self.UI_MAIN_WINDOW, ui_file.errorString()))
+            sys.exit(-1)
+        loader = QUiLoader()
+        main_window = loader.load(self.UI_MAIN_WINDOW, None)
+        ui_file.close()
+
+        if not main_window:
+            print(loader.errorString())
+            sys.exit(-1)
+
+        self.main_window = main_window
+        self.setupMainWindow()
+
+        main_window.show()
+        sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    default_config = {
+        'templates_dir': '/usr/share/armbian/configurator/modules/softwares',
+        'install_dir': '/opt/armbian/docker',
+        'service_name': 'docker'
+    }
+
+    gui = ModuleGUI(DockerComposeModule(default_config))
+    gui.start()
