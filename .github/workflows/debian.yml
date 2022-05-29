@@ -21,6 +21,7 @@ jobs:
       homepage: "https://www.armbian.com"
       section: "default"
       priority: "optional"
+      depends: "libpyside2-dev"
       description: "Configurator"
 
     secrets:
