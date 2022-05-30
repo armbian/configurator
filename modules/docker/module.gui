@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from pathlib import Path
 import subprocess
 import sys
+import yaml
 
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication
@@ -10,6 +12,11 @@ from PySide2.QtCore import QFile, QIODevice
 from PySide2.QtGui import QStandardItemModel, QStandardItem
 
 from library.docker_compose import DockerComposeModule
+
+# TODO Reset right pane correctly, dissociate reset code from fill code
+# TODO Select installed item after installation automatically
+# TODO Use a QSS for theming
+# TODO Make it look decent
 
 class ModuleGUI:
     UI_MAIN_WINDOW = "modulewindow_qt.ui"
@@ -66,6 +73,9 @@ class ModuleGUI:
     def cb_edit_button(self):
         subprocess.run(['xdg-open', str(self.engine.compose_yaml_path(self.current_item['name']))])
 
+    def cb_open_folder_button(self):
+        subprocess.run(['xdg-open', str(self.engine.installed_path(self.current_item['name']))])
+
     def cb_uninstall_button(self):
         self.engine.docker_remove([self.current_item['name']])
         self.main_window.installedList.clearSelection()
@@ -94,52 +104,66 @@ class ModuleGUI:
             if current_item['installed'] and content_func:
                 text_browser.append(content_func())
 
-        installed_buttons = [
-            [main_window.upButton, self.cb_up_button],
-            [main_window.downButton, self.cb_down_button],
-            [main_window.editButton, self.cb_edit_button],
-            [main_window.uninstallButton, self.cb_uninstall_button]
-        ]
+        buttons = {
+            True: [
+                [main_window.upButton, self.cb_up_button],
+                [main_window.downButton, self.cb_down_button],
+                [main_window.editButton, self.cb_edit_button],
+                [main_window.openFolderButton, self.cb_open_folder_button],
+                [main_window.uninstallButton, self.cb_uninstall_button]
+            ],
+            False: [
+                [main_window.installButton, self.cb_install_button]
+            ]
+        }
 
-        available_buttons = [
-            [main_window.installButton, self.cb_install_button]
-        ]
+        for installed_state, buttons_and_cb in buttons.items():
+            for button_and_cb in buttons_and_cb:
+                button, cb = button_and_cb
+                if current_item['installed'] == installed_state:
+                    button.pressed.connect(cb)
+                else:
+                    try:
+                        button.pressed.disconnect()
+                    except:
+                        pass
 
-        for button_and_cb in installed_buttons:
-            button, cb = button_and_cb
-            if current_item['installed']:
-                button.show()
-                button.pressed.connect(cb)
-            else:
-                button.hide()
+        # TODO Find a better name
+        widgets_states = {
+            True: [main_window.installedButtons],
+            False: [main_window.notInstalledButtons]
+        }
 
-        # TODO Factorize
-        for button_and_cb in available_buttons:
-            button, cb = button_and_cb
-            if not current_item['installed']:
-                button.show()
-                button.pressed.connect(cb)
-            else:
-                button.hide()
+        for installed_state, widgets in widgets_states.items():
+            for widget in widgets:
+                if current_item['installed'] == installed_state:
+                    print(f'Showing {widget}')
+                    widget.show()
+                else:
+                    print(f'Hiding {widget}')
+                    widget.hide()
 
 
-    def cb_show_installed_item(self, item_index):
+    def cb_show_item(self, item_info, item_list, item_installed: bool):
         # TODO Remove this horrible hack
         # TODO Make the two lists synced somehow, through group headers or something
-        self.main_window.availableList.clearSelection()
-        print(item_index.row())
-        print(item_index.data())
-        self.current_item = {'name': item_index.data(), 'installed': True}
+        selections_list = [
+            self.main_window.availableList,
+            self.main_window.installedList
+        ]
+        for listview in selections_list:
+            if listview != item_list:
+                listview.clearSelection()
+
+        self.current_item = {'name': item_info.data(), 'installed': item_installed}
         self.ui_show_current_item()
 
+    def cb_show_installed_item(self, item_index):
+        self.cb_show_item(item_index, self.main_window.installedList, True)
 
     def cb_show_available_item(self, item_index):
-        # TODO Remove this horrible hack
-        # TODO Make the two lists synced somehow, through group headers or something
-        self.main_window.installedList.clearSelection()
-        print(item_index.row())
-        print(item_index.data())
-        self.current_item = {'name': item_index.data(), 'installed': False}
+        self.cb_show_item(item_index, self.main_window.availableList, self.engine.is_installed(item_index.data()))
+
 
     def setupMainWindow(self):
         lists = [
@@ -179,11 +203,14 @@ class ModuleGUI:
 
 
 if __name__ == '__main__':
-    default_config = {
-        'templates_dir': '/usr/share/armbian/configurator/modules/softwares',
-        'install_dir': '/opt/armbian/docker',
-        'service_name': 'docker'
-    }
+    configuration_file_path = Path('configuration/default.yaml')
+    with open(configuration_file_path, 'r') as conf_file:
+        try:
+            default_config = yaml.safe_load(conf_file)
+            gui = ModuleGUI(DockerComposeModule(default_config))
+            gui.start()
+        except Exception as e:
+            logging.error(f'Could not open configuration file {configuration_file_path}')
+            logging.error(e)
 
-    gui = ModuleGUI(DockerComposeModule(default_config))
-    gui.start()
+

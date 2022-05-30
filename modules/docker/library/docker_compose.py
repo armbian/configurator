@@ -70,6 +70,11 @@ class DockerComposeModule:
     def installed_path(self, service_name:str):
         return (self.configuration["install_dir"] / service_name)
 
+    # FIXME This is a very weak way to check for installations
+    def is_installed(self, service_name:str):
+        return self.installed_path(service_name).exists()
+
+
     @staticmethod
     def list_installed(configuration) -> list:
         return FileUtilities.list_dirs(
@@ -195,9 +200,10 @@ class DockerComposeModule:
         return ret
 
     def compose_stop(self, services_names: list):
+        ret = []
         if not services_names:
             self.logger.debug('No services provided for stop')
-            return
+            return ret
 
         for service_name in services_names:
             self.logger.info(f'Stopping {service_name}')
