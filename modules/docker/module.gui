@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from inspect import getsourcefile
 from pathlib import Path
+import os
 import subprocess
 import sys
 import yaml
 
+from PySide2.QtCore import QFile, QIODevice, QTranslator, QCoreApplication, QLocale
+from PySide2.QtGui import QStandardItemModel, QStandardItem
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication
-from PySide2.QtCore import QFile, QIODevice
-from PySide2.QtGui import QStandardItemModel, QStandardItem
 
 from library.docker_compose import DockerComposeModule
 
@@ -19,7 +21,9 @@ from library.docker_compose import DockerComposeModule
 # TODO Make it look decent
 
 class ModuleGUI:
-    UI_MAIN_WINDOW = "modulewindow_qt.ui"
+    UI_MAIN_WINDOW = 'ui/mainwindow/designer.ui'
+    UI_CSS = 'ui/style.css'
+    UI_TRANSLATIONS_DIRPATH = 'ui/mainwindow/translations'
 
     main_window = None
 
@@ -90,7 +94,7 @@ class ModuleGUI:
         main_window = self.main_window
         current_item = self.current_item
 
-        main_window.currentComposeNameLabel.text = current_item['name']
+        main_window.currentComposeNameLabel.setText(current_item['name'])
 
         texts_contents = [
             [main_window.runLogsText, None],
@@ -183,27 +187,46 @@ class ModuleGUI:
 
     def start(self):
         app = QApplication(sys.argv)
+
+        # Handle translations files
+        translator = QTranslator()
+        translator.load(QLocale(), 'ui/mainwindow/translations/mainwindow', '.', '', '.qm')
+        QCoreApplication.installTranslator(translator)
+
         ui_file = QFile(self.UI_MAIN_WINDOW)
-        if not ui_file.open(QIODevice.ReadOnly):
-            print("Cannot open {}: {}".format(self.UI_MAIN_WINDOW, ui_file.errorString()))
-            sys.exit(-1)
+
         loader = QUiLoader()
         main_window = loader.load(self.UI_MAIN_WINDOW, None)
-        ui_file.close()
 
         if not main_window:
             print(loader.errorString())
             sys.exit(-1)
 
         self.main_window = main_window
+
+        with open(self.UI_CSS, 'r') as qss_file:
+            app.setStyleSheet(qss_file.read())
+
+
+
         self.setupMainWindow()
 
         main_window.show()
         sys.exit(app.exec_())
 
-
 if __name__ == '__main__':
+
+    # Set the current working directory as the script one
+    os.chdir(os.path.dirname(getsourcefile(lambda:0)))
+    #module_directory = '/usr/share/armbian/configurator/modules/docker'
+    #if 'ARMBIAN_MODULE_DIRECTORY' in os.environ:
+    #    module_directory = os.environ['ARMBIAN_MODULE_DIRECTORY']
+    #os.chdir(module_directory)
+
+    # FIXME Parse configuration files from a set of directories
+    # including user writeable ones.
     configuration_file_path = Path('configuration/default.yaml')
+
     with open(configuration_file_path, 'r') as conf_file:
         try:
             default_config = yaml.safe_load(conf_file)
