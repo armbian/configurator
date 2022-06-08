@@ -1,6 +1,18 @@
-# Armbian configurator
+<p align="center">
+  <a href="#build-framework">
+  <img src="https://raw.githubusercontent.com/armbian/build/master/.github/armbian-logo.png" alt="Armbian logo" width="144">
+  </a><br>
+  <strong>configurator</strong><br>
+</p>
 
-[![Build debian package](https://github.com/armbian/configurator/actions/workflows/debian.yml/badge.svg)](https://github.com/armbian/configurator/actions/workflows/debian.yml)
+
+[![GitHub last commit (branch)](https://img.shields.io/github/last-commit/armbian/build/master)](https://github.com/armbian/build/commits)
+[![Debian repository](https://github.com/armbian/configurator/actions/workflows/debian.yml/badge.svg)](https://github.com/armbian/configurator/actions/workflows/debian.yml)
+[![Unit testings](https://github.com/armbian/configurator/actions/workflows/tests.yml/badge.svg)](https://github.com/armbian/configurator/actions/workflows/tests.yml)
+[![Twitter Follow](https://img.shields.io/twitter/follow/armbian?style=flat-square)](https://twitter.com/intent/follow?screen_name=armbian)
+[![Join the Discord](https://img.shields.io/discord/854735915313659944.svg?color=7289da&label=Discord%20&logo=discord)](https://discord.com/invite/gNJ2fPZKvc)
+[![Become a patron](https://img.shields.io/liberapay/patrons/armbian.svg?logo=liberapay)](https://liberapay.com/armbian)
+
 
 - [Open tasks](https://armbian.atlassian.net/browse/AR-967)
 
