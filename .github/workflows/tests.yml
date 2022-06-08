@@ -7,8 +7,8 @@ on:
       - completed
 
 jobs:
-  install:
-    name: "Install configurator"
+  test:
+    name: "Testing configurator"
     runs-on: ubuntu-latest
 
     steps:
@@ -21,12 +21,6 @@ jobs:
           | sudo tee /etc/apt/sources.list.d/armbian-development.list > /dev/null
           sudo apt update
           sudo apt-get -y install configurator
-          
-  run:
-    name: "Run configurator commands"
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: "Run tests"
+      - name: "Run configurator commands"
         run: |
           echo "Hello world"
