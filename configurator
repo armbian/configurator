@@ -6,66 +6,172 @@ import os
 import subprocess
 import sys
 
-MODULES_PATH=Path('/usr/share/armbian/configurator/modules')
+class Configurator:
+    # FIXME Parse these information from configuration files
+    MODULES_PATH=Path('/usr/share/armbian/configurator/modules')
+    REQUIRED_FILES_PATHS=['module.cli', 'DESC']
 
-# TODO Put such functions and setup into libraries
+    # TODO Put such functions and setup into libraries
 
-main_logger = logging.getLogger('armbian-configurator')
-main_logger.setLevel(logging.DEBUG)
-main_logger.addHandler(logging.StreamHandler())
+    def __init__(self):
+        main_logger = logging.getLogger('armbian-configurator')
+        main_logger.setLevel(logging.DEBUG)
+        main_logger.addHandler(logging.StreamHandler())
+        self.main_logger = main_logger
 
-def list_dirs(from_dir=".", containing_files=[]) -> list:
-    entries = None
-    try:
-        entries = os.scandir(from_dir)
-    except:
-        return []
-    dirs = []
-    for entry in entries:
-        if entry.is_dir():
-            directory = entry.name
-            all_files_present = True
-            for file_to_search in containing_files:
-                checked_file_path = Path(from_dir) / directory / file_to_search
-                #main_logger.debug(f'Does {checked_file_path} exist ? {checked_file_path.exists()}')
-                all_files_present &= checked_file_path.exists()
+    def list_dirs(self, from_dir=".", containing_files=[]) -> list:
+        entries = None
+        try:
+            entries = os.scandir(from_dir)
+        except:
+            return []
+        dirs = []
+        for entry in entries:
+            if entry.is_dir():
+                directory = entry.name
+                all_files_present = True
+                for file_to_search in containing_files:
+                    checked_file_path = Path(from_dir) / directory / file_to_search
+                    self.main_logger.debug(f'Does {checked_file_path} exist ? {checked_file_path.exists()}')
+                    all_files_present &= checked_file_path.exists()
 
-            if all_files_present:
-                dirs.append(directory)
-    return dirs
+                if all_files_present:
+                    dirs.append(directory)
+        return dirs
 
-def module_path(module_name: str):
-    return
+    def module_path(self, module_name: str) -> Path:
+        return self.MODULES_PATH / module_name
 
-def list_modules() -> list:
-    return sorted(list_dirs(
-        from_dir=MODULES_PATH,
-        containing_files=["module.cli", "DESC"]))
+    def available_modes_for_module(self, module_name: str) -> list:
+        entries = None
+        modes = []
+        try:
+            entries = os.scandir(self.module_path(module_name))
+            for entry in entries:
+                if entry.is_file() and entry.name.startswith('module.'):
+                    modes.append(entry.name.split('.')[1])
+        except Exception as e:
+            self.main_logger.error(f'Could not access module {module_name}')
+            self.main_logger.error(e)
 
-def list_modules_with_descriptions() -> tuple:
-    modules = list_modules()
-    descriptions = []
-    # TODO Error management with some files can't be opened
-    # TODO Implement locale management
-    for module_name in modules:
-        desc_file_path = MODULES_PATH / module_name / "DESC"
+        return modes
+
+    def best_locale_desc_path_for(self, module_name: str) -> Path:
+        module_root_path = self.module_path(module_name)
+        # LANG is generally something like
+        #  C
+        #  en_US.utf8
+        #  fr_FR.iso8859-15
+        # We only use the part before the '.', so
+        # we split at '.' and take the first element
+        locale = os.environ['LANG'].split('.')[0]
+
+        # To continue, in the case of fr_FR, to retrieve
+        # only "fr", we split at '_' and take the first
+        # element
+        simple_locale = locale.split('_')[0]
+
+        potential_paths = [
+            module_root_path / f'DESC.{locale}',
+            module_root_path / f'DESC.{simple_locale}',
+            module_root_path / f'DESC']
+
+        for desc_path in potential_paths:
+            if desc_path.exists():
+                return desc_path
+
+        self.main_logger.error('No Description found')
+
+        return None
+
+
+
+    def list_modules(self) -> list:
+        return sorted(self.list_dirs(
+            from_dir=self.MODULES_PATH,
+            containing_files=self.REQUIRED_FILES_PATHS))
+
+    def module_exist(self, module_name: str) -> bool:
+        module_path = self.module_path(module_name)
+        all_files_present = True
+
+        for file_path in self.REQUIRED_FILES_PATHS:
+            all_files_present &= (module_path / file_path).exists()
+
+        return all_files_present
+
+    def module_description(self, module_name: str) -> dict:
+        info = {}
+
+        if not self.module_exist(module_name):
+            self.main_logger.error(f'Module {module_name} does not exist')
+            return info
+
+        desc_file_path = self.best_locale_desc_path_for(module_name)
+        if not desc_file_path:
+            self.main_logger.error(f'No description found for module {module_name} !')
+            return info
+
+        modes = self.available_modes_for_module(module_name)
+        # 'module.cli' is mandatory.
+        # No modes returned means that 'module.cli' was not found.
+        if not modes:
+            self.main_logger.error(f'module.cli was not for module {module_name}')
+            return info
+
+        # FIXME Deal with errors here
         with open(desc_file_path) as desc_file:
-            descriptions.append(desc_file.readline())
-    return (modules, descriptions)
+            info['description'] = desc_file.readline()
 
-def show_modules():
-    modules, descriptions = list_modules_with_descriptions()
-    for i in range(len(modules)):
-        print(f'\t{modules[i]}\t{descriptions[i]}')
+        info['modes'] = modes
 
-def execute_module(module_name: str, mode="cli"):
-    subprocess.run([Path(module_name) / f'module.{mode}'])
+        return info
+
+    def list_modules_with_descriptions(self) -> tuple:
+        # FIXME Create an appropriate structure or object
+        # Make an array of it and output it
+        modules_info = {}
+        modules = self.list_modules()
+
+        for module_name in modules:
+            info = self.module_description(module_name)
+            if not info:
+                self.main_logger.error(f'Could not get accurate info about module {module_name}. Skipping...')
+
+            modules_info[module_name] = info
+
+        return modules_info
+
+    def print_modules(self, modules_info: dict = None):
+        if not modules_info:
+            modules_info = self.list_modules_with_descriptions()
+
+        for module_name in modules_info:
+            info = modules_info[module_name]
+            print(f'\t{module_name}\t{info["modes"]}\t{info["description"]}')
+
+
+    def execute_module(self, module_name: str, arguments: list):
+        info = self.module_description(module_name)
+        # FIXME Check if TUI or GUI can actually be run !
+        # If no display is available, and the console is not
+        # interactive, there's no way to execute GUI or TUI !
+        mode = 'cli'
+        if not arguments:
+            if 'gui' in info['modes']:
+                mode = 'gui'
+            elif 'tui' in info['modes']:
+                mode = 'tui'
+
+        subprocess.run([self.module_path(module_name) / f'module.{mode}'] + arguments)
 
 if __name__ == '__main__':
 
     arguments = sys.argv
-    if len(arguments) < 2:
-        show_modules()
+    configurator = Configurator()
+    n_args = len(arguments)
+    if n_args < 2:
+        configurator.print_modules()
     else:
         module_name = arguments[1]
-        execute_module(module_name)
+        configurator.execute_module(module_name, arguments=arguments[2:])

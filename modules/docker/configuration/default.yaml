@@ -1,0 +1,7 @@
+version: 1
+# Directory containing the docker-compose templates to install
+templates_dir: "/usr/share/armbian/configurator/modules/docker/softwares"
+# Directory where docker-compose installations are
+install_dir: "/opt/armbian/docker"
+# The name of the docker service
+service_name: "docker"

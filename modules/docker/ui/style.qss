@@ -1,0 +1,7 @@
+/* The file is actually sampled by the app.
+ * However, only one property is defined at the moment.
+ * Since I can't find a decent QSS file...
+ */
+QMainWindow {
+	background-color:#eee;
+}
