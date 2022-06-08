@@ -1,0 +1,14 @@
+name: Unit testings
+
+on:
+  workflow_run:
+    workflows: ["Build debian package"]
+    types:
+      - completed
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
