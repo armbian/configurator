@@ -7,11 +7,12 @@ on:
       - completed
 
 jobs:
-  test:
+  install:
+    name: "Install configurator"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Add repository
+      - name: "Add repository"
         run: |
           sudo wget -qO- https://imola.armbian.com/apt/armbian.key | \
           gpg --dearmor | sudo tee /usr/share/keyrings/armbian.gpg > /dev/null
@@ -21,3 +22,11 @@ jobs:
           sudo apt update
           sudo apt-get -y install configurator
           
+  run:
+    name: "Run configurator commands"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Run tests"
+        run: |
+          echo "Hello world"
