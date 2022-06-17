@@ -1,14 +1,14 @@
 Package: configurator
-Version: 20220608-2053
+Version: 20220617-2015
 Architecture: all
 Maintainer: Igor Pecovnik <igor@armbian.com>
 Depends: libpyside2-dev
 Priority: optional
 Section: default
-Filename: pool/main/c/configurator/configurator_20220608-2053_all.deb
-Size: 26676
-SHA256: d25eb989337537d0a23b6340eb08a23b698f18fd6d312e7659254714a908378d
-SHA1: 96cee38db844524c55290cad6ec1b14b4744c70f
-MD5sum: 4e3c314b4872eed3ba1311b10fa52eaf
+Filename: pool/main/c/configurator/configurator_20220617-2015_all.deb
+Size: 26680
+SHA256: d1e08baac88e82f2cd7c2fe51caf928282da4ea433475fd64fb1ecd98c89c3b5
+SHA1: f36d52c4b6a9ff73df07d13df022f1fffa008e26
+MD5sum: be13cb6d2a9237f84095ad23fee8a24b
 Description: Configurator
 
