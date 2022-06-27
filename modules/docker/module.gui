@@ -62,6 +62,18 @@ class ModuleGUI:
     def logic_get_status_output(self) -> str:
         return self.logic_get_command_output(self.current_item['name'], self.engine.compose_status)
 
+    def _show_compose_command_output_in(self, text_output, command: str, service_name: str):
+        text_output.append(
+            self.logic_get_command_output(service_name, command))
+
+    def logic_get_logs(self) -> str:
+        return self.logic_get_command_output(
+            self.current_item['name'],
+            self.engine.compose_logs)
+
+    def _xdg_open(self, element_path: str):
+        subprocess.run(['xdg-open', element_path])
+
     def cb_up_button(self):
         self.main_window.statusText.append(
             self.logic_get_command_output(
@@ -74,11 +86,17 @@ class ModuleGUI:
                 self.current_item['name'],
                 self.engine.compose_stop))
 
+    def cb_logs_button(self):
+        self.main_window.logsText.clear()
+        self.main_window.logsText.append(self.logic_get_logs())
+
     def cb_edit_button(self):
-        subprocess.run(['xdg-open', str(self.engine.compose_yaml_path(self.current_item['name']))])
+        # subprocess.run(['xdg-open', str(self.engine.compose_yaml_path(self.current_item['name']))])
+        self._xdg_open( str(self.engine.compose_yaml_path(self.current_item['name'])) )
 
     def cb_open_folder_button(self):
-        subprocess.run(['xdg-open', str(self.engine.installed_path(self.current_item['name']))])
+        # subprocess.run(['xdg-open', str(self.engine.installed_path(self.current_item['name']))])
+        self._xdg_open( str(self.engine.installed_path(self.current_item['name'])) )
 
     def cb_uninstall_button(self):
         self.engine.docker_remove([self.current_item['name']])
@@ -98,8 +116,9 @@ class ModuleGUI:
 
         texts_contents = [
             [main_window.runLogsText, None],
-            [main_window.yamlText, self.logic_get_compose_yaml_content],
-            [main_window.statusText, self.logic_get_status_output]
+            [main_window.yamlText,    self.logic_get_compose_yaml_content],
+            [main_window.statusText,  self.logic_get_status_output],
+            [main_window.logsText,    self.logic_get_logs]
         ]
 
         for text_browser_and_content_func in texts_contents:
@@ -110,11 +129,12 @@ class ModuleGUI:
 
         buttons = {
             True: [
-                [main_window.upButton, self.cb_up_button],
-                [main_window.downButton, self.cb_down_button],
-                [main_window.editButton, self.cb_edit_button],
+                [main_window.upButton,         self.cb_up_button],
+                [main_window.downButton,       self.cb_down_button],
+                [main_window.editButton,       self.cb_edit_button],
                 [main_window.openFolderButton, self.cb_open_folder_button],
-                [main_window.uninstallButton, self.cb_uninstall_button]
+                [main_window.uninstallButton,  self.cb_uninstall_button],
+                [main_window.getLogsButton,    self.cb_logs_button]
             ],
             False: [
                 [main_window.installButton, self.cb_install_button]
@@ -168,8 +188,22 @@ class ModuleGUI:
     def cb_show_available_item(self, item_index):
         self.cb_show_item(item_index, self.main_window.availableList, self.engine.is_installed(item_index.data()))
 
+    def cb_menu_quit(self):
+        QCoreApplication.quit()
+
+    def cb_menu_open_docker_folder(self):
+        self._xdg_open(self.engine.install_dirpath())
 
     def setupMainWindow(self):
+        menu_items = [
+            [self.main_window.actionQuit, self.cb_menu_quit],
+            [self.main_window.actionOpenInstallFolder, self.cb_menu_open_docker_folder]
+        ]
+
+        for menu_item_and_cb in menu_items:
+            menu_item, cb = menu_item_and_cb
+            menu_item.triggered.connect(cb)
+
         lists = [
             [self.main_window.installedList, self.cb_show_installed_item],
             [self.main_window.availableList, self.cb_show_available_item]

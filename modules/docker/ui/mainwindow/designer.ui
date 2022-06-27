@@ -93,7 +93,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_4" stretch="0,0,1,2">
+       <layout class="QVBoxLayout" name="verticalLayout_4" stretch="0,0,1,2,0">
         <item>
          <widget class="QWidget" name="installedButtons" native="true">
           <layout class="QHBoxLayout" name="installedLayout">
@@ -302,6 +302,20 @@
           </item>
          </layout>
         </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_7">
+          <item>
+           <widget class="QPushButton" name="getLogsButton">
+            <property name="text">
+             <string>Show Logs</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QTextBrowser" name="logsText"/>
+          </item>
+         </layout>
+        </item>
        </layout>
       </item>
      </layout>
@@ -319,16 +333,28 @@
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
-     <string>File</string>
+     <string>Application</string>
     </property>
     <addaction name="actionQuit"/>
    </widget>
+   <widget class="QMenu" name="menuDocker">
+    <property name="title">
+     <string>Docker</string>
+    </property>
+    <addaction name="actionOpenInstallFolder"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuDocker"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionQuit">
    <property name="text">
     <string>Quit</string>
+   </property>
+  </action>
+  <action name="actionOpenInstallFolder">
+   <property name="text">
+    <string>Open installation folder</string>
    </property>
   </action>
  </widget>
