@@ -67,6 +67,9 @@ class DockerComposeModule:
         self.logger.addHandler(logging.StreamHandler())
         self.services_handler = SystemDServicesHandler()
 
+    def install_dirpath(self):
+        return self.configuration["install_dir"]
+
     def installed_path(self, service_name:str):
         return (self.configuration["install_dir"] / service_name)
 
@@ -168,48 +171,85 @@ class DockerComposeModule:
     def docker_service_remove_from_boot(self):
         self.services_handler.remove_from_boot(self.configuration['service_name'])
 
-    # TODO Factorize
-    def compose_status(self, services_names: list):
+    def _compose_command(self, message: str, tool_filename: str, services_names: list):
+
         ret = []
         if not services_names:
             self.logger.debug('No services provided for status')
             return ret
 
         for service_name in services_names:
-            self.logger.info(f'Showing {service_name} status')
+            self.logger.info(message.format(service_name = service_name))
             outputs = self.output_script_result(
-                tool_name = "compose_status.sh",
+                tool_name = tool_filename,
                 args = [self.service_path(service_name, "docker-compose.yml")])
             ret.append(outputs)
 
         return ret
+
+    # TODO Factorize
+    def compose_status(self, services_names: list):
+        return self._compose_command(
+            'Showing {service_name} status',
+            'compose_status.sh',
+            services_names)
+
+#        ret = []
+#        if not services_names:
+#            self.logger.debug('No services provided for status')
+#            return ret
+
+#        for service_name in services_names:
+#            self.logger.info(f'Showing {service_name} status')
+#            outputs = self.output_script_result(
+#                tool_name = "compose_status.sh",
+#                args = [self.service_path(service_name, "docker-compose.yml")])
+#            ret.append(outputs)
+#
+        #return ret
 
     def compose_start(self, services_names: list):
-        ret = []
-        if not services_names:
-            self.logger.debug('No services provided for start')
-            return ret
+        return self._compose_command(
+            'Starting {service_name}',
+            'compose_start.sh',
+            services_names)
 
-        for service_name in services_names:
-            self.logger.info(f'Starting {service_name}')
-            outputs = self.output_script_result(
-                tool_name = "compose_start.sh",
-                args = [self.service_path(service_name, "docker-compose.yml")])
-            ret.append(outputs)
+        #ret = []
+        #if not services_names:
+            #self.logger.debug('No services provided for start')
+            #return ret
 
-        return ret
+        #for service_name in services_names:
+            #self.logger.info(f'Starting {service_name}')
+            #outputs = self.output_script_result(
+                #tool_name = "compose_start.sh",
+                #args = [self.service_path(service_name, "docker-compose.yml")])
+            #ret.append(outputs)
+
+        #return ret
 
     def compose_stop(self, services_names: list):
-        ret = []
-        if not services_names:
-            self.logger.debug('No services provided for stop')
-            return ret
+        return self._compose_command(
+            'Stopping {service_name}',
+            'compose_stop.sh',
+            services_names)
 
-        for service_name in services_names:
-            self.logger.info(f'Stopping {service_name}')
-            outputs = self.output_script_result(
-                tool_name = "compose_stop.sh",
-                args = [self.service_path(service_name, "docker-compose.yml")])
-            ret.append(outputs)
+        #ret = []
+        #if not services_names:
+            #self.logger.debug('No services provided for stop')
+            #return ret
 
-        return ret
+        #for service_name in services_names:
+            #self.logger.info(f'Stopping {service_name}')
+            #outputs = self.output_script_result(
+                #tool_name = "compose_stop.sh",
+                #args = [self.service_path(service_name, "docker-compose.yml")])
+            #ret.append(outputs)
+
+        #return ret
+
+    def compose_logs(self, services_names: list):
+        return self._compose_command(
+            'Showing logs of {service_name}',
+            'compose_logs.sh',
+            services_names)
