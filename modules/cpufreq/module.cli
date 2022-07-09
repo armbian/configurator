@@ -1,0 +1,34 @@
+#!/bin/bash
+
+show_usage()
+{
+	echo "Usage ${0} cpu_min_freq cpu_max_freq cpu_governor"
+
+	POLICY="policy0"
+	[[ $(grep -c '^processor' /proc/cpuinfo) -gt 4 ]] && POLICY="policy4"
+	[[ ! -d /sys/devices/system/cpu/cpufreq/policy4 ]] && POLICY="policy0"
+
+	[[ -d /sys/devices/system/cpu/cpufreq/policy0 && -d /sys/devices/system/cpu/cpufreq/policy2 ]] && POLICY="policy2"
+
+	echo "AVAILABLE FREQUENCIES :"
+	cat /sys/devices/system/cpu/cpufreq/$POLICY/scaling_available_frequencies
+
+	echo "AVAILABLE GOVERNORS :"
+	cat /sys/devices/system/cpu/cpufreq/$POLICY/scaling_available_governors
+}
+
+if [ "$#" -ge 3 ]; then
+	MIN_SPEED=$1
+	MAX_SPEED=$2
+	GOVERNOR=$3
+
+	sed -i "s/MIN_SPEED=.*/MIN_SPEED=$MIN_SPEED/" /etc/default/cpufrequtils
+	sed -i "s/MAX_SPEED=.*/MAX_SPEED=$MAX_SPEED/" /etc/default/cpufrequtils
+	sed -i "s/GOVERNOR=.*/GOVERNOR=$GOVERNOR/" /etc/default/cpufrequtils
+	systemctl restart cpufrequtils
+	sync
+
+else
+	show_usage
+fi
+
