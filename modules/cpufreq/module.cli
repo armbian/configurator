@@ -11,8 +11,13 @@ show_usage()
 	[[ -d /sys/devices/system/cpu/cpufreq/policy0 && -d /sys/devices/system/cpu/cpufreq/policy2 ]] && POLICY="policy2"
 
 	echo "AVAILABLE FREQUENCIES :"
-	cat /sys/devices/system/cpu/cpufreq/$POLICY/scaling_available_frequencies
-
+	if [[ -f /sys/devices/system/cpu/cpufreq/$POLICY/scaling_available_frequencies ]]; then
+		cat /sys/devices/system/cpu/cpufreq/$POLICY/scaling_available_frequencies
+	else
+		cat /sys/devices/system/cpu/cpufreq/$POLICY/cpuinfo_min_freq \
+		    /sys/devices/system/cpu/cpufreq/$POLICY/cpuinfo_max_freq | sed -z 's/\n/ /g'
+	fi
+        echo ""
 	echo "AVAILABLE GOVERNORS :"
 	cat /sys/devices/system/cpu/cpufreq/$POLICY/scaling_available_governors
 }
