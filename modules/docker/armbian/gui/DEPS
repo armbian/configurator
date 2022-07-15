@@ -1,1 +1,1 @@
-docker.io docker-compose libpyside2-dev python3-pyside2.qtcore python3-pyside2.qtgui python3-pyside2.qtwidgets python3-pyside2.* python3-yaml python3-qtpy
+docker.io docker-compose libpyside2-dev python3-pyside2.qtcore python3-pyside2.qtgui python3-pyside2.qtwidgets python3-pyside2.qtuitools python3-yaml python3-qtpy
