@@ -6,18 +6,27 @@ import os
 import subprocess
 import sys
 
+# TODO Review the architecture
+# Currently, the packaging and the execution folder architectures
+# are mixed together.
+# Try to decouple them.
+
 class Configurator:
     # FIXME Parse these information from configuration files
-    MODULES_PATH=Path('/usr/share/armbian/configurator/modules')
-    REQUIRED_FILES_PATHS=['module.cli', 'DESC']
+    REQUIRED_FILES_PATHS=['module', 'DESC']
 
     # TODO Put such functions and setup into libraries
 
-    def __init__(self):
+    def __init__(self, architecture, distribution, modules_path):
         main_logger = logging.getLogger('armbian-configurator')
         main_logger.setLevel(logging.DEBUG)
         main_logger.addHandler(logging.StreamHandler())
-        self.main_logger = main_logger
+        self.main_logger  = main_logger
+        self.modules_path = Path(modules_path)
+        self.architecture = architecture
+        self.distribution = distribution
+
+        self.list_modules_renewed(self.modules_path)
 
     def list_dirs(self, from_dir=".", containing_files=[]) -> list:
         entries = None
@@ -25,22 +34,27 @@ class Configurator:
             entries = os.scandir(from_dir)
         except:
             return []
-        dirs = []
-        for entry in entries:
-            if entry.is_dir():
-                directory = entry.name
-                all_files_present = True
-                for file_to_search in containing_files:
-                    checked_file_path = Path(from_dir) / directory / file_to_search
-                    self.main_logger.debug(f'Does {checked_file_path} exist ? {checked_file_path.exists()}')
-                    all_files_present &= checked_file_path.exists()
+        dirs = [Path(entry.path) for entry in entries if entry.is_dir()]
 
-                if all_files_present:
-                    dirs.append(directory)
-        return dirs
+        valid_dirs = []
+        for directory in dirs:
+            all_files_present = True
+            for required_file in containing_files:
+                required_file_path = Path(dir) / required_file
+                all_files_present &= required_file_path.exists()
+                self.main_logger.debug(f'Does {required_file_path} exist ? {required_file_path.exists()}')
+            if all_files_present:
+                valid_dirs.append(directory)
+        return valid_dirs
+
+    # Python program to illustrate the intersection
+    # of two lists in most simple way
+    # https://www.geeksforgeeks.org/python-intersection-two-lists/
+    def intersection(self, a, b):
+        return [value for value in a if value in b]
 
     def module_path(self, module_name: str) -> Path:
-        return self.MODULES_PATH / module_name
+        return self.modules_path / module_name
 
     def available_modes_for_module(self, module_name: str) -> list:
         entries = None
@@ -85,10 +99,51 @@ class Configurator:
         return None
 
 
+    # x86/cli
+
+    def list_modules_renewed(self, modules_path:str):
+        modules = {}
+        # By order of importance, from generic to specialized
+        architectures_dirs = ['any_arch', f'{self.architecture}']
+        try:
+            entries = os.scandir(modules_path)
+        except:
+            self.main_logger.error(
+                f'Cannot access modules directory {modules_path}.')
+            return modules
+        dir_names = [Path(entry.name) for entry in entries if entry.is_dir()]
+
+        for module_name in dir_names:
+            module_dirpath = Path(modules_path / module_name)
+            arch_dirs = self.intersection(
+                [entry.name for entry in os.scandir(module_dirpath)],
+                architectures_dirs)
+            if not arch_dirs:
+                self.main_logger.info(f'No support for architecture {self.architecture} in {module_name} : Skipping')
+                continue
+
+            modes_dirpaths = {}
+            for arch_dirname in arch_dirs:
+                arch_dirpath = module_dirpath / arch_dirname
+
+                modules_modes = self.list_dirs(
+                    from_dir=arch_dirpath,
+                    containing_files=self.REQUIRED_FILES_PATHS)
+
+                available_modes = self.intersection(modules_modes, ["cli", "tui", "gui"])
+                for mode in available_modes:
+                    modes_dirpaths[mode] = arch_dirpath / mode
+
+            if "cli" in modes_dirpaths:
+                modules[module_name] = modes_dirpaths
+            else:
+                self.main_logger.warning(f'Ignoring module {module_name} (arch: {arch_dirname}) since no valid CLI mode were found')
+
+        return modules
 
     def list_modules(self) -> list:
         return sorted(self.list_dirs(
-            from_dir=self.MODULES_PATH,
+            from_dir=self.modules_path,
             containing_files=self.REQUIRED_FILES_PATHS))
 
     def module_exist(self, module_name: str) -> bool:
@@ -151,6 +206,9 @@ class Configurator:
             print(f'\t{module_name}\t{info["modes"]}\t{info["description"]}')
 
 
+    def system_can_handle_gui(self):
+        return "DISPLAY" in os.environ
+
     def execute_module(self, module_name: str, arguments: list):
         info = self.module_description(module_name)
         # FIXME Check if TUI or GUI can actually be run !
@@ -158,7 +216,7 @@ class Configurator:
         # interactive, there's no way to execute GUI or TUI !
         mode = 'cli'
         if not arguments:
-            if 'gui' in info['modes']:
+            if 'gui' in info['modes'] and self.system_can_handle_gui():
                 mode = 'gui'
             elif 'tui' in info['modes']:
                 mode = 'tui'
@@ -167,8 +225,30 @@ class Configurator:
 
 if __name__ == '__main__':
 
+    def command(*command_line):
+        return subprocess.check_output(command_line).decode().strip()
+
+    architecture = command('uname', '-i').lower()
+    if architecture == 'unknown':
+        architecture = command('uname', '-m')
+
+    distribution = ''
+    try:
+        lsb_release_output = command('lsb_release', '-i').lower()
+        if 'debian' in lsb_release_output:
+            distribution = 'debian'
+        elif 'ubuntu' in lsb_release_output:
+            distribution = 'ubuntu'
+        else:
+            distribution = lsb_release_output
+    except:
+        print('Cannot determine distribution')
+
     arguments = sys.argv
-    configurator = Configurator()
+    configurator = Configurator(
+        architecture=architecture,
+        distribution=distribution,
+        modules_path='/usr/share/armbian/configurator/modules')
     n_args = len(arguments)
     if n_args < 2:
         configurator.print_modules()
