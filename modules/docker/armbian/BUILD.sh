@@ -1,3 +1,1 @@
-#!/bin/bash
-
 ./install.sh
