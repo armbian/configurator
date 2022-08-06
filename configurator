@@ -3,61 +3,99 @@
 import logging
 from pathlib import Path
 import os
+import stat
 import subprocess
 import sys
 
+# TODO Review the architecture
+# Currently, the packaging and the execution folder architectures
+# are mixed together.
+# Try to decouple them.
+
+class Helpers:
+    @staticmethod
+    def get_logger(name: str = 'default'):
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.DEBUG)
+
+        # Avoid messages duplication after multiple Jupyter Lab runs
+        handler_console = None
+        handlers = logger.handlers
+        for h in handlers:
+            if isinstance(h, logging.StreamHandler):
+                handler_console = h
+                break
+        if not handler_console:
+            logger.addHandler(logging.StreamHandler())
+
+        return logger
+
+    @staticmethod
+    def list_dirs(from_dir: Path):
+        return [entry for entry in os.scandir(from_dir) if entry.is_dir()]
+
+    @staticmethod
+    def list_dirnames(from_dir: Path):
+        return [entry.name for entry in os.scandir(from_dir) if entry.is_dir()]
+
+    @staticmethod
+    def check_dir(directory: Path, contains:dict = {}, logger=get_logger()) -> bool:
+        all_subpaths_present = True
+        for relative_subpath, check_method in contains.items():
+            sub_path = directory / relative_subpath
+            all_subpaths_present = sub_path.exists() and check_method(sub_path)
+            # For debug purposes
+            if not sub_path.exists():
+                logger.debug(f'{sub_path} does not exist')
+        return all_subpaths_present
+
+    @staticmethod
+    def check_is_file(pathname: Path, logger=get_logger()) -> bool:
+        ret = pathname.is_file()
+        if not ret:
+            logger.error(f'{pathname} is not a file')
+        return ret
+
+    # TODO Factorize this by adding the permissions to check
+    # as an argument, and bind these arguments when using
+    # these methods as 'function pointers'.
+    @staticmethod
+    def check_is_readable_file(pathname: Path, logger=get_logger()) -> bool:
+        if not Helpers.check_is_file(pathname):
+            return False
+
+        if not ((os.stat(pathname).st_mode & stat.S_IRUSR)):
+            logger.error(f'{pathname} is not readable by its owner')
+            return False
+
+    @staticmethod
+    def check_is_exe_file(pathname: Path, logger=get_logger()) -> bool:
+        if not Helpers.check_is_file(pathname):
+            return False
+
+        if not ((os.stat(pathname).st_mode & stat.S_IXUSR) != 0):
+            logger.error(f'{pathname} is not executable by its owner')
+            return False
+
+        return True
+
 class Configurator:
     # FIXME Parse these information from configuration files
-    MODULES_PATH=Path('/usr/share/armbian/configurator/modules')
-    REQUIRED_FILES_PATHS=['module.cli', 'DESC']
+    REQUIRED_FILES_PATHS=['module', 'DESC']
 
     # TODO Put such functions and setup into libraries
 
-    def __init__(self):
+    def __init__(self, modules_dirpath):
         main_logger = logging.getLogger('armbian-configurator')
         main_logger.setLevel(logging.DEBUG)
         main_logger.addHandler(logging.StreamHandler())
-        self.main_logger = main_logger
+        self.logger  = main_logger
+        self.modules_dirpath = Path(modules_dirpath)
+        self.list_modules()
 
-    def list_dirs(self, from_dir=".", containing_files=[]) -> list:
-        entries = None
-        try:
-            entries = os.scandir(from_dir)
-        except:
-            return []
-        dirs = []
-        for entry in entries:
-            if entry.is_dir():
-                directory = entry.name
-                all_files_present = True
-                for file_to_search in containing_files:
-                    checked_file_path = Path(from_dir) / directory / file_to_search
-                    self.main_logger.debug(f'Does {checked_file_path} exist ? {checked_file_path.exists()}')
-                    all_files_present &= checked_file_path.exists()
-
-                if all_files_present:
-                    dirs.append(directory)
-        return dirs
-
-    def module_path(self, module_name: str) -> Path:
-        return self.MODULES_PATH / module_name
-
-    def available_modes_for_module(self, module_name: str) -> list:
-        entries = None
-        modes = []
-        try:
-            entries = os.scandir(self.module_path(module_name))
-            for entry in entries:
-                if entry.is_file() and entry.name.startswith('module.'):
-                    modes.append(entry.name.split('.')[1])
-        except Exception as e:
-            self.main_logger.error(f'Could not access module {module_name}')
-            self.main_logger.error(e)
-
-        return modes
-
-    def best_locale_desc_path_for(self, module_name: str) -> Path:
+    def best_desc_filename(self, module_name: str) -> Path:
         module_root_path = self.module_path(module_name)
+
         # LANG is generally something like
         #  C
         #  en_US.utf8
@@ -71,104 +109,110 @@ class Configurator:
         # element
         simple_locale = locale.split('_')[0]
 
-        potential_paths = [
-            module_root_path / f'DESC.{locale}',
-            module_root_path / f'DESC.{simple_locale}',
-            module_root_path / f'DESC']
+        desc_filenames = [f'DESC.{locale}', f'DESC.{simple_locale}', f'DESC']
 
-        for desc_path in potential_paths:
-            if desc_path.exists():
-                return desc_path
+        for desc_filename in desc_filenames:
+            desc_filepath = module_root_path / desc_filename
+            if desc_filepath.exists():
+                return desc_filepath
 
-        self.main_logger.error('No Description found')
+        # There IS ZERO reason for this message to appear.
+        # Hence the 'CRITICAL' level of the error.
+        # We're supposed to list the descriptions of available modules.
+        # The availability of a module is checked beforehand
+        # and requires a 'DESC' to be in the module folder.
+        self.logger.critical('No Description found')
 
-        return None
+        return ''
+
+    def list_modules(self):
+        # TODO Bind the logger in the check methods
+        required_files = { 'DESC': Helpers.check_is_readable_file, 'cli/module': Helpers.check_is_exe_file }
+        modules_dirpath = self.modules_dirpath
+
+        modules = {}
+        for name in Helpers.list_dirnames(modules_dirpath):
+            sub_path = modules_dirpath / name
+            is_module = Helpers.check_dir(directory = sub_path, contains = required_files)
+            if not is_module:
+                continue
+
+            modes = ['cli']
+            for additional_mode in ['tui', 'gui']:
+                mode_files = { f'{additional_mode}/module': Helpers.check_is_exe_file }
+                has_required_files = Helpers.check_dir(directory = sub_path, contains = mode_files)
+                if not has_required_files:
+                    continue
+                modes.append(additional_mode)
 
 
+            modules[name] = {'modes': modes, 'desc': sub_path / self.best_desc_filename(name)}
+        self.modules = modules
 
-    def list_modules(self) -> list:
-        return sorted(self.list_dirs(
-            from_dir=self.MODULES_PATH,
-            containing_files=self.REQUIRED_FILES_PATHS))
+    def module_path(self, module_name: str) -> Path:
+        return self.modules_dirpath / module_name
 
     def module_exist(self, module_name: str) -> bool:
-        module_path = self.module_path(module_name)
-        all_files_present = True
+        return module_name in self.modules
 
-        for file_path in self.REQUIRED_FILES_PATHS:
-            all_files_present &= (module_path / file_path).exists()
+    def module_modes(self, module_name: str) -> list:
+        return self.modules[module_name]['modes'] if self.module_exist(module_name) else []
 
-        return all_files_present
+    def module_desc(self, module_name: str) -> str:
+        with open(self.modules[module_name]['desc']) as desc_file:
+            return desc_file.readline()
 
-    def module_description(self, module_name: str) -> dict:
-        info = {}
+    def print_modules(self):
+        for module_name in self.modules:
+            modes = self.module_modes(module_name)
+            desc  = self.module_desc(module_name)
+            self.logger.info(f'\t{module_name}\t{modes}\t{desc}')
 
+    def system_can_handle_gui(self):
+        return "DISPLAY" in os.environ
+
+    def execute_module(self, module_name: str, arguments: list, mode: str = '') -> int:
         if not self.module_exist(module_name):
-            self.main_logger.error(f'Module {module_name} does not exist')
-            return info
+            self.logger.critical(f'{module_name} does not exist !')
 
-        desc_file_path = self.best_locale_desc_path_for(module_name)
-        if not desc_file_path:
-            self.main_logger.error(f'No description found for module {module_name} !')
-            return info
+        modes = self.module_modes(module_name)
 
-        modes = self.available_modes_for_module(module_name)
-        # 'module.cli' is mandatory.
-        # No modes returned means that 'module.cli' was not found.
-        if not modes:
-            self.main_logger.error(f'module.cli was not for module {module_name}')
-            return info
+        if not mode:
+            mode = 'cli'
+            if not arguments:
+                if 'gui' in modes and self.system_can_handle_gui():
+                    mode = 'gui'
+                elif 'tui' in modes:
+                    mode = 'tui'
+                else:
+                    mode = 'cli'
+        else:
+            if not mode in modes:
+                self.logger.critical(f'{module_name} has no {mode} mode')
+                sys.exit(1)
 
-        # FIXME Deal with errors here
-        with open(desc_file_path) as desc_file:
-            info['description'] = desc_file.readline()
+        subprocess.run([self.module_path(module_name) / mode / 'module'] + arguments)
 
-        info['modes'] = modes
-
-        return info
-
-    def list_modules_with_descriptions(self) -> tuple:
-        # FIXME Create an appropriate structure or object
-        # Make an array of it and output it
-        modules_info = {}
-        modules = self.list_modules()
-
-        for module_name in modules:
-            info = self.module_description(module_name)
-            if not info:
-                self.main_logger.error(f'Could not get accurate info about module {module_name}. Skipping...')
-
-            modules_info[module_name] = info
-
-        return modules_info
-
-    def print_modules(self, modules_info: dict = None):
-        if not modules_info:
-            modules_info = self.list_modules_with_descriptions()
-
-        for module_name in modules_info:
-            info = modules_info[module_name]
-            print(f'\t{module_name}\t{info["modes"]}\t{info["description"]}')
-
-
-    def execute_module(self, module_name: str, arguments: list):
-        info = self.module_description(module_name)
-        # FIXME Check if TUI or GUI can actually be run !
-        # If no display is available, and the console is not
-        # interactive, there's no way to execute GUI or TUI !
-        mode = 'cli'
-        if not arguments:
-            if 'gui' in info['modes']:
-                mode = 'gui'
-            elif 'tui' in info['modes']:
-                mode = 'tui'
-
-        subprocess.run([self.module_path(module_name) / f'module.{mode}'] + arguments)
 
 if __name__ == '__main__':
 
+    # TODO Make it configurable through config files
+    # AND command line arguments
+    default_modules_path = '/usr/share/armbian/configurator/modules'
+    modules_dirpath = default_modules_path
+    if 'ARMBIAN_MODULES_DIRPATH' in os.environ:
+        modules_dirpath = os.environ['ARMBIAN_MODULES_DIRPATH']
+
+    configurator = Configurator(modules_dirpath=modules_dirpath)
+
+    # Not using ArgParser at the moment since I need to keep
+    # track of the position of the arguments.
+    # All the arguments passed after the module name are passed
+    # to the module 'as-is' and should not be interpreted in any
+    # way.
+    # Parsing the arguments before with ArgParser should not
+    # be THAT hard... still, this will be for the next time.
     arguments = sys.argv
-    configurator = Configurator()
     n_args = len(arguments)
     if n_args < 2:
         configurator.print_modules()
