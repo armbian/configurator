@@ -1,73 +1,89 @@
 Version: 1
 Status: DRAFT
 
+# Status
+
+While this tutorial will explain you how to start coding your own
+module, it won't be prepared for packaging...
+
+TODO : Add a 'build' script example that make the whole thing ready
+for packaging.
+
 # Main design
 
-## Adding a module
+## Coding your own CLI module
 
-For each module you want to add :
+1. Create a directory where you'll put the CLI module code and `cd` into it.  
+   Example :  
+```bash
+mkdir -p ~/Documents/my_armbian_module
+cd ~/Documents/my_armbian_module
+```
 
-1. Create a directory inside `modules/`.
-2. Inside this directory add the following files :
-    1. **module.cli**  
-    The CLI version of the module that will be executed by default.  
-    This can be symlinked to system binaries, if you know what you're
-    doing.
-    2. **DESC**  
-    A description of the module.  
-    The first line should be brief, as it is shown in the list
-    provided by the main **configurator**, when listing all the modules.
-    3. **armbian/cli/DEPS**  
-    The list of additional Debian packages required to execute `module.cli`.  
-    Only put the dependencies that are not required by the **configurator**
-    itself.
+2. Create a file named `DESC` and write a short description for this module.  
+```bash
+echo "Best module ever" > DESC
+```
 
-## Adding a GUI (X11/Wayland) to a module
+3. Add a `module` file and ensure it is executable.  
+   This file will be the one executed by the configurator when running
+   your module.  
+```bash
+echo '#!/bin/bash' > module
+echo "echo 'I told you, best module ever \!'" >> module
+chmod +x module
+```
 
-Adding a GUI to a module, inside `modules/{module_name}`,
-you need to add :
+4. Create the directory `/usr/share/armbian/configurator/modules/${module_name}/cli`  
+   Example, if your module is named 'my_module' :  
+```bash
+module_name=my_module
+sudo mkdir -p "/usr/share/armbian/configurator/modules/${module_name}"
+```
+5. Link the `DESC` file to `/usr/share/armbian/configurator/modules/${module_name}/DESC`  
+```bash
+module_name=my_module
+sudo ln -s "${PWD}/DESC" "/usr/share/armbian/configurator/modules/${module_name}/DESC"
+```
+6. Link the directory itself to `/usr/share/armbian/configurator/modules/${module_name}/cli`  
+```bash
+module_name=my_module
+sudo ln -s "${PWD}" "/usr/share/armbian/configurator/modules/${module_name}/cli"
+```
 
-1. **module.gui**  
-The GUI version of the module.
-2. **armbian/gui/DEPS**  
-The list of additional Debian packages required to execute `module.gui`.  
-Only put the dependencies that are not required by the **configurator**
-itself.  
-Dependencies shared with the CLI version still need to be written.
+Now, the module is recognized by the configurator.
 
-> **Symlinking to `module.cli`**
->
-> It is possible to have a single executable managing
-> both CLI and GUI, but remember that the CLI version
-> **MUST NOT** depend on GUI libraries.  
-> For example, you cannot ask for QT/GTK/OpenGL for CLI
-> softwares.
->
-> Which mean that single executables managing CLI and
-> GUI must load GUI libraries dynamically.  
-> For scripting languages, you can branch load the
-> libraries after a few sanity checks.  
-> For compiled languages, you'll need to deal with
-> dynamically loaded libraries.
->
-> So, think again before putting both in the same executable.
-> Having two executables sharing the same configuration
-> files and codebase might be far easier.
+Launch the configurator without arguments to see your module in the list.  
+Launch the configurator with the name of your module to launch it :
 
-## Adding a translation
+```bash
+module_name=my_module
+configurator ${module_name}
+```
 
-> Support for this feature will be added very soon
+```
+I told you, best module ever !
+```
 
-To add a translation for a module description,
-inside `modules/{module_name}`, create a `DESC.{locale}` file.
+## Adding a GUI (X11/Wayland) to your module
+
+1. Create a directory where you'll put the GUI executable of your module.
+2. Make sure your GUI executable name is named `module`
+3. Link it to `/usr/share/armbian/configurator/modules/${module_name}/gui`
+
+You're done
+
+## Adding a translation to the short description
+
+To add a translation for a module description, add a `DESC.{locale}` file
+to `/usr/share/armbian/configurator/modules/${module_name}/`
 
 Precise locales are sampled before global ones, however
 avoid using precise locales names when you can.
 
 ### Example
 
-Let's say you want to add a French translation for a module
-description.
+Let's say you want to add a French translation for a module description.
 
 French locales start with `fr`.  
 French locale for people living in France specifically is : `fr_FR`.  
@@ -91,3 +107,6 @@ if you only add `DESC.fr_FR`, the system will use :
 * `DESC.fr_FR` for people using the `fr_FR` locale.  
 * `DESC` (default english version) for people using the `fr_CA` locale.
 
+## Prepare for packaging
+
+In order to prepare the module for packaging, see **PACKAGING.md**.

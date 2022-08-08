@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import logging
-from pathlib import Path
 import os
+from pathlib import Path
 import stat
 import subprocess
 import sys
@@ -16,7 +17,7 @@ class Helpers:
     @staticmethod
     def get_logger(name: str = 'default'):
         logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
         # Avoid messages duplication after multiple Jupyter Lab runs
         handler_console = None
@@ -164,8 +165,8 @@ class Configurator:
 
     def print_modules(self):
         for module_name in self.modules:
-            modes = self.module_modes(module_name)
-            desc  = self.module_desc(module_name)
+            modes = ', '.join(self.module_modes(module_name))
+            desc  = self.module_desc(module_name).strip()
             self.logger.info(f'\t{module_name}\t{modes}\t{desc}')
 
     def system_can_handle_gui(self):
@@ -173,7 +174,8 @@ class Configurator:
 
     def execute_module(self, module_name: str, arguments: list, mode: str = '') -> int:
         if not self.module_exist(module_name):
-            self.logger.critical(f'{module_name} does not exist !')
+            self.logger.critical(f'Module {module_name} does not exist !')
+            return -1
 
         modes = self.module_modes(module_name)
 
@@ -188,13 +190,13 @@ class Configurator:
                     mode = 'cli'
         else:
             if not mode in modes:
-                self.logger.critical(f'{module_name} has no {mode} mode')
-                sys.exit(1)
+                self.logger.critical(f'The module {module_name} has no {mode} mode')
+                return -1
 
         subprocess.run([self.module_path(module_name) / mode / 'module'] + arguments)
 
 
-if __name__ == '__main__':
+def parse_arguments(arguments: list):
 
     # TODO Make it configurable through config files
     # AND command line arguments
@@ -205,17 +207,62 @@ if __name__ == '__main__':
 
     configurator = Configurator(modules_dirpath=modules_dirpath)
 
-    # Not using ArgParser at the moment since I need to keep
-    # track of the position of the arguments.
-    # All the arguments passed after the module name are passed
-    # to the module 'as-is' and should not be interpreted in any
-    # way.
-    # Parsing the arguments before with ArgParser should not
-    # be THAT hard... still, this will be for the next time.
-    arguments = sys.argv
-    n_args = len(arguments)
-    if n_args < 2:
+    epilog  = 'The modules are all installed in /usr/share/armbian/configurator/modules\n\n'
+    epilog += 'Example usage :\n'
+    epilog += '    configurator docker\n'
+
+
+    parser = ArgumentParser(
+        description='Armbian configurator')
+        #formatter_class=RawDescriptionHelpFormatter,
+        #epilog=epilog)
+    parser.add_argument('module')
+    parser.add_argument('--mode', nargs=1, choices=['cli', 'tui', 'gui'], help='Launch a module in a specific mode')
+
+
+    # Basically, ArgParse should only manage the arguments that
+    # are passed to the configurator.
+    # The other arguments must be passed "as-is" to the module.
+    # So :
+    # * We search for the first argument that doesn't start with
+    # a dash
+    # * We consider that to be the module name
+    # * We cut the array after the module name.
+    #   This new array is considered to be the arguments to
+    #   the module.
+    configurator_args = arguments[1:]
+    module_args = []
+    for i in range(1,len(arguments)):
+        if not (arguments[i].startswith("-")):
+            next_arg = i + 1
+            configurator_args = arguments[1:next_arg]
+            module_args = arguments[next_arg:]
+            break
+
+    result = []
+    try:
+        result = parser.parse_args(configurator_args)
+    except:
+        print('\nAvailable modules are :\n')
         configurator.print_modules()
-    else:
-        module_name = arguments[1]
-        configurator.execute_module(module_name, arguments=arguments[2:])
+        print(epilog)
+        sys.exit(1)
+
+    mode = ''
+    if result.mode:
+        mode = mode.join(result.mode)
+
+    sys.exit(configurator.execute_module(result.module, arguments=module_args, mode=mode))
+
+if __name__ == '__main__':
+
+
+    parse_arguments(sys.argv)
+    sys.exit(0)
+    #arguments = sys.argv
+    #n_args = len(arguments)
+    #if n_args < 2:
+        #configurator.print_modules()
+    #else:
+        #module_name = arguments[1]
+        #configurator.execute_module(module_name, arguments=arguments[2:])
