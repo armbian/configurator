@@ -2,7 +2,7 @@ name: Unit testings
 
 on:
   workflow_run:
-    workflows: ["Build debian package"]
+    workflows: ["Debian package"]
     types:
       - completed
 
