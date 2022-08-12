@@ -12,8 +12,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      - uses: actions/checkout@v3
+
       - name: "Add repository"
         run: |
+
           sudo wget -qO- https://imola.armbian.com/apt/armbian.key | \
           gpg --dearmor | sudo tee /usr/share/keyrings/armbian.gpg > /dev/null
           sudo echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/armbian.gpg] \
@@ -21,6 +25,9 @@ jobs:
           | sudo tee /etc/apt/sources.list.d/armbian-development.list > /dev/null
           sudo apt update
           sudo apt-get -y install configurator
-      - name: "Run configurator commands"
+
+      - name: "Run configurator commands under BATS"
         run: |
-          echo "Hello world"
+
+          bash --version
+          bats --tap test/
