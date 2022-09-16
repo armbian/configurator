@@ -140,6 +140,7 @@ class DockerComposeModule:
                     shutil.rmtree(remove_path)
                 except Exception as e:
                     self.logger.error(f'Could not delete {remove_path}')
+                    self.logger.error(e)
                     continue
             else:
                 self.logger.error(f'{remove_path} does not exist. Skipping {docker_compose_service}')

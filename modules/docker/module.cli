@@ -231,6 +231,8 @@ if __name__ == '__main__':
     if args.install:
         new_installs = [i for i in args.install if i not in module.list_installed(config)]
         module.docker_install(new_installs)
+    #if args.edit:
+    #    module.edit_configuration_files(args.edit)
     if args.service:
         actions = {
             'start': module.docker_service_start,
@@ -240,7 +242,12 @@ if __name__ == '__main__':
             'disable': module.docker_service_remove_from_boot
         }
         actions[args.service[0]]()
-    module.compose_stop(args.stop)
-    module.compose_start(args.start)
-    module.compose_status(args.status)
+    if args.stop:
+        module.compose_stop(args.stop)
+
+    if args.start:
+        module.compose_start(args.start)
+
+    if args.status:
+        module.compose_status(args.status)
 

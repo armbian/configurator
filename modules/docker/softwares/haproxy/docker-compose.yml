@@ -6,7 +6,7 @@ services:
     image: haproxy:latest
     volumes:
       - "./haproxy/conf:/usr/local/etc/haproxy:ro"
-      - "./ssl:/etc/ssl/mine:ro"
+      - "haproxy_ssl:/etc/ssl/mine:ro"
       # Redirecting HAProxy logs can be troublesome
       # The container /dev/log to host /dev/log does
       # the trick, though.
@@ -25,14 +25,20 @@ services:
     volumes:
       - "./www:/usr/share/nginx/website:ro"
       - "./nginx/config/nginx.conf:/etc/nginx/nginx.conf:ro"
-      - "./nginx/cache:/var/cache/nginx"
-      - "./nginx/run:/var/run"
-      - "./nginx/logs:/var/log/nginx"
+      - "nginx_cache:/var/cache/nginx"
+      - "nginx_run:/var/run"
+      - "nginx_logs:/var/log/nginx"
     restart: always
     networks:
       haproxy_net:
         aliases:
           - that_nginx_server
+
+volumes:
+  haproxy_ssl:
+  nginx_cache:
+  nginx_run:
+  nginx_logs:
 
 networks:
   haproxy_net:
