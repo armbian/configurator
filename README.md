@@ -25,4 +25,5 @@ It is updated on this repository push.
 
 Install:
 
+    sudo apt-get update
     sudo apt-get install configurator
